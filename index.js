@@ -19,15 +19,14 @@ let scrapeItConfig = {
 };
 
 async function getData(url) {
-  let result = await scrapeIt(url, scrapeItConfig);
-  let data = result.data;
-  return data;
+  try {
+    let result = await scrapeIt(url, scrapeItConfig);
+    let data = result.data;
+    return data;
+  } catch (error) {
+    console.log(error);
+  }
 }
-
-// scrapeIt(url, scrapeItConfig).then(({ data, response }) => {
-//   console.log(`Status Code: ${response.statusCode}`);
-//   console.log(data);
-// });
 
 let url =
   "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/rn_forcecom_development.htm";
