@@ -11,8 +11,7 @@ let scrapeItConfig = {
         attr: "href"
       },
       content: {
-        texteq: 1,
-        convert: x => x.replace("  ", " ")
+        texteq: 1
       }
     }
   }
