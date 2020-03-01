@@ -1,23 +1,25 @@
 const scrapeIt = require("scrape-it");
-const fs = require("fs");
 
-let scrapeItConfig = {
-  contentBlock: {
-    listItem: ".topic-container .ullinks li",
-    data: {
-      title: "a",
-      href: {
-        selector: "a",
-        attr: "href"
-      },
-      content: {
-        texteq: 1
+async function requestReleaseNotesPageScrape(url) {
+  let scrapeItConfig = {
+    category: "h1",
+    items: {
+      listItem: ".topic-container .ullinks li",
+      data: {
+        title: "a",
+        href: {
+          selector: "a",
+          attr: "href"
+        },
+        content: {
+          texteq: 1
+        },
+        contentRaw: {
+          how: "html"
+        }
       }
     }
-  }
-};
-
-async function getData(url) {
+  };
   try {
     let result = await scrapeIt(url, scrapeItConfig);
     let data = result.data;
@@ -27,49 +29,53 @@ async function getData(url) {
   }
 }
 
-let url =
-  "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/rn_forcecom_development.htm";
-
-let url2 =
-  "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/rn_deployment.htm";
-
-let url3 =
-  "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/rn_security.htm";
-
-let url4 =
-  "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/rn_forcecom_custom.htm";
-
-async function getAllData() {
-  let resultArray = [];
+async function parseReleaseNotePages(urls) {
+  let allMyRequests = [];
+  urls.forEach(url => {
+    allMyRequests.push(requestReleaseNotesPageScrape(url));
+  });
   try {
-    let result = await getData(url);
-    let result2 = await getData(url2);
-    let result3 = await getData(url3);
-    let result4 = await getData(url4);
-    resultArray = resultArray.concat(result.contentBlock);
-    resultArray = resultArray.concat(result2.contentBlock);
-    resultArray = resultArray.concat(result3.contentBlock);
-    resultArray = resultArray.concat(result4.contentBlock);
-    return resultArray;
+    let result = await Promise.all(allMyRequests);
+    return result;
   } catch (error) {
     console.log(error);
   }
 }
 
-getAllData().then(data => {
-  data.forEach(article => {
-    article.content = article.content.replace(/\s+/g, " ");
-    article.href =
-      "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/" +
-      article.href;
-  });
+async function getTopics(urls) {
+  try {
+    let data = await parseReleaseNotePages(urls);
+    let topics = [];
+    data.forEach(result => {
+      result.items.forEach(item => {
+        // content contains apex classes
+        if (item.contentRaw.indexOf("codeph apex_code") > -1) {
+          let rawHtml = item.contentRaw;
+          // get content without header link
+          rawHtml = rawHtml.split("\n")[1];
+          let cleanText = rawHtml.replace(/(<([^>]+)>)/gi, "");
+          item.content = cleanText;
+        }
+        let topic = {
+          category: result.category.split(":")[0],
+          title: item.title,
+          content: item.content.replace(/\s+/g, " "),
+          href:
+            "https://releasenotes.docs.salesforce.com/en-us/spring20/release-notes/" +
+            item.href
+        };
 
-  let jsonContent = JSON.stringify(data, null, 4);
+        if (topic.content) {
+          topics.push(topic);
+        }
+      });
+    });
+    return topics;
+  } catch (error) {
+    console.log(error);
+  }
+}
 
-  fs.writeFile("quotation.json", jsonContent, "utf8", err => {
-    if (err) {
-      return console.log(err);
-    }
-    console.log("JSON file has been saved.");
-  });
-});
+module.exports = urls => {
+  return getTopics(urls);
+};
